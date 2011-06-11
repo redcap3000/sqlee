@@ -36,22 +36,13 @@ class sqlee{
 		// this checks if a file was uploaded
 		if($_FILES){
 			foreach($_FILES as $field_name=>$file){		
-			// look for a file field
-			// designate 'upload' folder somehow in a config (but never in the post object!!)
-			// generate stamp to prevent the same file name problem ..
 			// upload path makes system_folder variable confusing.. is upload path absolute or in relation to the config path? for now
-			// it is absolute
-			
-			$path = $sqlee_conf::$_['upload_path'] (sqlee_conf::$_['upload_timestamp'] == true?(date('B') + 0).'_':'') . $file['name'];
-			// do validations and checks ..
-			// next add a post variable for the post handler to store if it doesnt exist try to create it
+				$path = $sqlee_conf::$_['upload_path'] (sqlee_conf::$_['upload_timestamp'] == true?(date('B') + 0).'_':'') . $file['name'];
 				if(is_uploaded_file($file['tmp_name'])&& !copy($file['tmp_name'],$path))
 					echo '\n<div class="status"> error while copying the uploaded file</div>';
 				else  
 					$_POST[$field_name] = (date('B') + date('s')).'_' .$file['name'];
 			}
-			// make directory if possible and chmod it
-			 // swatch internet time plus the seconds, should prevent duplicate filenames
 		}
 		if($_POST) $_POST = self::postHandler();
 	}
@@ -93,17 +84,12 @@ class sqlee{
 
 	
 	public function genHandler($over=NULL){
-	// for now genHandler processes the 'validation' when fields should be validated inside of the genf_input to properly report that an error has occured
-	// in the html form... how do we do this without repeating tons of code?
 	if($over != NULL) return 'select * from `'.$this->table.'` where '.$this->pkey.' = '.$this->id.' LIMIT 1' ;
 		switch($this->action){
 			case 'update':
-			// do validation here ... maybe make a function
 				if(($this->action != 'stop' ||$this->action != 'hash_error') && ($_POST && $_POST['handler'])){
 				// this occurs when a person posts a handler
 					$count = count($_POST);
-					// this is a silly way to update the fields .. we should just find a better way to compare rather than figure out why we have an extra comma..
-					
 					if($count > 1 && !$_POST['delete_confirm']){
 					// count is greater than 1 when we are doing an insert or update, the delete /delete_confirm actions do not send anything except the handler
 						// remove one from count to account for unsetting the handler .. this is temporary removing for the extra handler and handler_ser
@@ -160,8 +146,6 @@ class sqlee{
 							</form>		
 									';break;
 			case 'insert':
-				// need a handler to pass back info for the unique record check? will need to make a write handler to pass back the 'validation' settings for 'empty/not empty' validations ...
-				// next up is to validate, perhaps add another level to the 'required' fields and designate the type of validation email - number - date - name - money  etc.
 				$insert = self::validateInsertFields();
 				$p_copy = $_POST;
 				unset($p_copy['handler']);
@@ -170,19 +154,9 @@ class sqlee{
 					$insert = self::band_aid("insert into `$this->table`(".implode(',', array_keys($p_copy)).") VALUES ('".implode("','",$p_copy)."');",2);	
 					// is this reloading ?
 					// instead of this we could attempt to load the value by modifying the handler post var ? or is it too late ??
-					if($insert && $_POST['handler']=='insert::')	{
-					//	$_POST['handler'] = "edit::$insert";
-						// newwp didn't work piece of shit
-						
-					// also over ride the argArg too?
-					self::reload_form();
-					
-					}
-					// is insert the value of the newly updated record ?
-					// next we should get the value of the insert statement and regenerate a handler ?					
+					if($insert && $_POST['handler']=='insert::')
+						self::reload_form();
 					$result.= ($insert?'<h4 class="status">Insert successful!</h4>':'<h4 class="status">Problems with insert</h4>');
-					// now refresh after the insert statement ?
-
 				}else {
 					// if we get to this we end up with the wrong fields var after the post value .. minor issue but should be handled
 					$result.= 'Please examine input for errors below.';
@@ -199,8 +173,8 @@ class sqlee{
 		$post = $_POST;
 		foreach($post as $key=>$value){	
 			if(strpos($key,'-') !== false) {
-					// we'll always need to unset all of these keys for insert/updates to work properly, since these values
-					// are combined into the appropriate value
+				// we'll always need to unset all of these keys for insert/updates to work properly, since these values
+				// are combined into the appropriate value
 				// what happens if we do the below before we come to the validation key?
 					$temp= explode('-',$key); 
 					switch ($temp[1]){
@@ -214,10 +188,9 @@ class sqlee{
 					unset($temp);
 			}elseif(strpos($key,'_mbo') !== false){
 				$key_n = str_replace('_mbo','',$key);
-				//unset old key so it doesn't get inserted (will cause error)
-					// add option value to the field
-					// this code will only be exceuted within the admin (preferably)
-					// sometimes this option isn't written properly ... in $option_fields isn't being imploded
+				// add option value to the field
+				// this code will only be exceuted within the admin (preferably)
+				// sometimes this option isn't written properly ... in $option_fields isn't being imploded
 				if($value != '')
 					$option_fields []= $key_n. ':' . ($value == 'on'?'true':$value);
 				unset($post[$key]);
@@ -230,18 +203,25 @@ class sqlee{
 			if(is_array($value)){
 				//no use of a for loop to do this all in one line, since we should control the order
 				// of the values - so if anyone makes modifications to the way a time/date stamp form is ordered it won't break the update/insert
-				// turn into an additive statement.
 				$date = $value['year'].'-'.$value['month'].'-'. $value['day'];
 				$year = $value['year'];
-				if(count($value)==3)
-					$post[$key] = $date.' 00:00:00';
-				elseif(count($value)==5)
-				// do the whole timestamp ... add optional support for seconds
-					$post[$key] = $date. ' ' . $value['hour'].':'.$value['min'].($value['sec']?$value['sec']:':00');
-				//elseif(count($value)==2)
-				// process time only here support time, and also support year add support to genf input
-				elseif(count($value)==1)
-					$post[$key] = $value['year'];
+				switch (count($value)){
+					case (5):
+						//full time/date stamp
+						$post[$key] = $date. ' ' . $value['hour'].':'.$value['min'].($value['sec']?$value['sec']:':00');
+						break;
+					case(3):
+						// date with zero time
+						$post[$key] = $date.' 00:00:00';
+						break;
+					case(1):
+						// year
+						$post[$key] = $value['year'];
+						break;	
+								}
+					//case(2):
+					// process time only here support time, and also support year add support to genf input
+					//break;
 			}
 		}
 		return $post;
@@ -257,9 +237,7 @@ class sqlee{
 		$form_filter =($arr['form_filter']?$arr['form_filter']:NULL);
 		$ex = ($arr['form_mode']?$arr['form_mode']:1);
 		if($ex) $this->ex = $ex;
-		if($form_filter != NULL){
-			$this->form_filter = $form_filter;
-		}
+		if($form_filter != NULL)	$this->form_filter = $form_filter;
 	// sometimes we show an insert screen after a sucessful delete
 		if($_POST['handler']){
 			$handler = explode('::',$_POST['handler'],2);
@@ -288,6 +266,7 @@ class sqlee{
 		$status = self::genHandler();
 		
 		// this mainly looks at post variables to determine the state of the form - or what elements to show which is a combination of record inserter and records listing
+		// you have some problems after a delete cancel or deletion, that hides the insert record form when in manager mode
 		return ($_POST['handler']? ($ex==2?'Form submitted sucessfully.':($status && !is_array($status)?$status:NULL).(!$_POST['delete']?self::genForm($this->edit_fields,'edit'):self::insert_record()) . ($this->action != 'edit' ||$this->action != 'insert'?(!$_POST['delete'] || $_POST['delete'] == 'Delete' || $ex == 3?self::genf_input(NULL,NULL,$this->table,'record_list',$this->pkey): ''):'')):($ex == 3? self::genf_input(NULL,NULL,$this->table,'record_list',$this->pkey) . (!$_POST['delete_confirm']?self::insert_record():''):($ex == 2? self::insert_record():($ex == 1?self::genf_input(NULL,NULL,$this->table,'record_list',$this->pkey):NULL))));
 	}		
 	private function genForm($fields=NULL,$action="save_new",$extra=NULL,$id=NULL){
@@ -600,8 +579,10 @@ class sqlee{
 					return "\n<table class='sqlee_record_list' width='100%'>\n" . $return .  "\n</table>\n";
 				// the idea is here to get a series of fields to display, and create a link that when pressed will go to edit that block
 					break;
-				case 'library_select':return self::build_attr_menu(self::dir_list('/system/libraries/'),'load_class_mbo');break;
-				case 'conf_select':return self::build_attr_menu(self::dir_list('/system/conf/'),'edit_conf_mbo');break;
+				// these are myparse sepecific for the administrator interface to allow a user to dynamically select a library/configuration editor to load from a web interface that interacts with a sqlee object to 
+				// change this value in a database table, in the context of myparse it makes much more sense.	
+				//case 'library_select':return self::build_attr_menu(self::dir_list('/system/libraries/'),'load_class_mbo');break;
+				//case 'conf_select':return self::build_attr_menu(self::dir_list('/system/conf/'),'edit_conf_mbo');break;
 				case 'record_select':
 					unset($this->where);
 				// eliminate need for 'extra' and point to own argArg objects this needs signfigant improvement
@@ -803,7 +784,9 @@ class sqlee{
 	// if we pass it simply an action then it will use the object parameters for its settings... we should probably try to process the arg arrays better to clean them up, or create a new array with the fields that need to be validate use array merge??
 		return "\n\t<input type='hidden' name='handler' value='$action::".self::rar($record_id,'id')."'>\n";
 	}
+	
 	private function doArg($arg_string){
+	// would be cool to attempt to reduce this by using a self-calling function, or even an array function if they exist to do this sort of thing
 		foreach(explode('+~',$arg_string) as $exploded){
 			$temp = explode('&&',$exploded);
 			if(is_array($temp) && count($temp)>1){
@@ -838,7 +821,7 @@ class sqlee{
 	
 	}
 	
-	private static function rar($var,$attr){
+	private function rar($var,$attr){
 	//return attribute one line getter if $var is NULL and the attr exists that attr is returned, otherwise NULL is returned the array key exists function is required to prevent a php fatal error with accessing a non existant object parameter
 		return ($var==NULL && is_array($attr) && array_key_exists($attr, $this)?$this->$attr:$var);
 	}
